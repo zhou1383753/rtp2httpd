@@ -1,44 +1,45 @@
-name: build-arm64
+name: build-arm64-from-source
 on: [workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Binary
-        run: |
-          # 1. 下载 ARM64 专用的二进制文件
-          curl -L "https://github.com/stackia/rtp2httpd/releases/download/v1.0.1/rtp2httpd-aarch64" -o rtp2httpd
-          chmod +x rtp2httpd
-          # 验证文件头是否包含 ELF 64-bit LSB executable, ARM aarch64
-          file rtp2httpd
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          repository: 'stackia/rtp2httpd' # 直接拉取作者源码
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Build with Docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Export
         run: |
-          # 2. 现场编写 Dockerfile，彻底禁用所有缓存和多余层
+          # 现场编写 Dockerfile：使用 golang 镜像在 ARM64 下编译
           cat <<EOF > Dockerfile
+          FROM --platform=linux/arm64 golang:1.21-alpine AS builder
+          WORKDIR /app
+          COPY . .
+          RUN go mod download && \
+              CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o rtp2httpd .
+
           FROM --platform=linux/arm64 alpine:latest
           RUN apk add --no-cache musl
-          # 直接将文件放入 /usr/bin/
-          COPY rtp2httpd /usr/bin/rtp2httpd
-          RUN chmod +x /usr/bin/rtp2httpd
+          COPY --from=builder /app/rtp2httpd /usr/bin/rtp2httpd
           EXPOSE 5140
           ENTRYPOINT ["/usr/bin/rtp2httpd"]
           CMD ["-p", "5140"]
           EOF
-          
-          # 3. 强制锁定单架构构建
-          docker build --platform linux/arm64 -t rtp-final:arm64 .
 
-      - name: Save to Tar
-        run: |
-          # 4. 导出为 MikroTik 最兼容的标准 Tar 格式
-          docker save rtp-final:arm64 > rtp2httpd_final.tar
+          # 执行构建
+          docker buildx build --platform linux/arm64 -t rtp2httpd:source-arm64 --load .
+          # 导出为标准格式
+          docker save rtp2httpd:source-arm64 > rtp2httpd_source.tar
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rb5009-final
-          path: rtp2httpd_final.tar
+          name: rb5009-source-tar
+          path: rtp2httpd_source.tar
