@@ -6,7 +6,7 @@ jobs:
     steps:
       - name: Download Binary
         run: |
-          # 确保下载的是针对 RB5009 的 aarch64 版本
+          # 明确指定版本号，确保下载稳定
           curl -L https://github.com/stackia/rtp2httpd/releases/download/v1.0.1/rtp2httpd-aarch64 -o rtp2httpd
           chmod +x rtp2httpd
 
@@ -26,13 +26,13 @@ jobs:
 
       - name: Build Image
         run: |
-          # 仅在本地构建镜像，不导出
-          docker build -t rtp2httpd-arm64:latest .
+          # 仅在本地构建 ARM64 镜像
+          docker build --platform linux/arm64 -t rtp2httpd:arm64 .
 
       - name: Export for MikroTik
         run: |
-          # 使用 save 命令导出，这种格式导入 MikroTik 成功率最高
-          docker save rtp2httpd-arm64:latest > rtp2httpd_arm64.tar
+          # 使用 save 命令导出，这是 MikroTik 最喜欢的标准 TAR 格式
+          docker save rtp2httpd:arm64 > rtp2httpd_arm64.tar
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
