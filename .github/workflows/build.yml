@@ -7,8 +7,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # 关键：递归拉取所有子模块，否则缺失 rules.mk
           submodules: recursive
+          fetch-depth: 0
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -17,15 +17,15 @@ jobs:
         run: |
           cat <<EOF > Dockerfile
           FROM alpine:latest AS builder
-          RUN apk add --no-cache gcc musl-dev make
-          COPY . /work
-          WORKDIR /work/src
-          # 修正编译逻辑
-          RUN make
+          RUN apk add --no-cache gcc musl-dev make git
+          COPY . /app
+          # 暴力进入所有子目录尝试编译，直到找到 Makefile
+          RUN cd /app && (cd src || cd .) && make
 
           FROM alpine:latest
-          COPY --from=builder /work/src/rtp2httpd /usr/bin/rtp2httpd
-          RUN chmod +x /usr/bin/rtp2httpd
+          # 使用 find 命令把编译出来的文件找出来并移动到 bin
+          COPY --from=builder /app /tmp/build
+          RUN find /tmp/build -name rtp2httpd -exec cp {} /usr/bin/rtp2httpd \; && chmod +x /usr/bin/rtp2httpd
           ENTRYPOINT ["/usr/bin/rtp2httpd"]
           CMD ["-p", "5140"]
           EOF
