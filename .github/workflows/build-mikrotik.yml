@@ -16,17 +16,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Create Dockerfile
+     - name: Create Dockerfile
         run: |
           cat <<EOF > Dockerfile
           FROM alpine:latest AS builder
           RUN apk add --no-cache gcc musl-dev make
           COPY . /src
-          WORKDIR /src
+          # 关键修改：进入源码所在的真实目录
+          WORKDIR /src/src
           RUN make
 
           FROM alpine:latest
-          COPY --from=builder /src/rtp2httpd /usr/bin/rtp2httpd
+          # 关键修改：从正确的位置拷贝编译产物
+          COPY --from=builder /src/src/rtp2httpd /usr/bin/rtp2httpd
           RUN chmod +x /usr/bin/rtp2httpd
           EXPOSE 5140
           ENTRYPOINT ["rtp2httpd"]
