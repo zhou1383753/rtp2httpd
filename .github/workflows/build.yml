@@ -6,7 +6,7 @@ jobs:
     steps:
       - name: Download Prebuilt Binary
         run: |
-          # 自动获取最新版本的 aarch64 二进制文件
+          # 直接下载作者编译好的成品 (针对 RB5009 的 ARM64 架构)
           wget https://github.com/stackia/rtp2httpd/releases/latest/download/rtp2httpd-aarch64 -O rtp2httpd
           chmod +x rtp2httpd
 
@@ -14,7 +14,6 @@ jobs:
         run: |
           cat <<EOF > Dockerfile
           FROM alpine:latest
-          # 安装基础运行库
           RUN apk add --no-cache musl
           COPY rtp2httpd /usr/bin/rtp2httpd
           EXPOSE 5140
@@ -27,7 +26,7 @@ jobs:
 
       - name: Build and Export Tar
         run: |
-          # 强制指定 arm64 架构打包
+          # 打包成适用于 RB5009 的镜像文件
           docker buildx build --platform linux/arm64 -t rtp2httpd:arm64 --output type=docker,dest=rtp2httpd_arm64.tar .
 
       - name: Upload Artifact
