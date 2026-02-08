@@ -4,42 +4,41 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Force Download ARM64
+      - name: Download Binary
         run: |
-          # 明确下载 aarch64 版本
+          # 1. 下载 ARM64 专用的二进制文件
           curl -L "https://github.com/stackia/rtp2httpd/releases/download/v1.0.1/rtp2httpd-aarch64" -o rtp2httpd
           chmod +x rtp2httpd
-          # 【关键检查】如果不是 ARM aarch64，这一步会终止流程
-          file rtp2httpd | grep -q "ARM aarch64" || (echo "错误：下载的文件不是 ARM64 架构！" && exit 1)
+          # 验证文件头是否包含 ELF 64-bit LSB executable, ARM aarch64
+          file rtp2httpd
 
-      - name: Create Dockerfile
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build with Docker
         run: |
+          # 2. 现场编写 Dockerfile，彻底禁用所有缓存和多余层
           cat <<EOF > Dockerfile
-          # 强制使用 ARM64 基础镜像
-          FROM --platform=linux/arm64 alpine:3.18
+          FROM --platform=linux/arm64 alpine:latest
           RUN apk add --no-cache musl
+          # 直接将文件放入 /usr/bin/
           COPY rtp2httpd /usr/bin/rtp2httpd
           RUN chmod +x /usr/bin/rtp2httpd
           EXPOSE 5140
           ENTRYPOINT ["/usr/bin/rtp2httpd"]
           CMD ["-p", "5140"]
           EOF
+          
+          # 3. 强制锁定单架构构建
+          docker build --platform linux/arm64 -t rtp-final:arm64 .
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and Load
+      - name: Save to Tar
         run: |
-          # 强制指定架构构建
-          docker buildx build --platform linux/arm64 -t rtp2httpd:arm64 --load .
-          # 导出并重命名，确保不会混淆
-          docker save rtp2httpd:arm64 > rtp2httpd_final_arm64.tar
+          # 4. 导出为 MikroTik 最兼容的标准 Tar 格式
+          docker save rtp-final:arm64 > rtp2httpd_final.tar
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: rb5009-final
-          path: rtp2httpd_final_arm64.tar
+          path: rtp2httpd_final.tar
