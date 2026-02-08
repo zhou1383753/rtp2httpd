@@ -13,12 +13,16 @@ jobs:
           FROM alpine:latest AS builder
           RUN apk add --no-cache gcc musl-dev make
           COPY . /src
+          # 关键点：stackia 源码就在根目录的 src 下
           WORKDIR /src/src
           RUN make
+          
           FROM alpine:latest
+          # 编译产物就在当前 src 目录下
           COPY --from=builder /src/src/rtp2httpd /usr/bin/rtp2httpd
           RUN chmod +x /usr/bin/rtp2httpd
-          ENTRYPOINT ["rtp2httpd"]
+          ENTRYPOINT ["/usr/bin/rtp2httpd"]
+          CMD ["-p", "5140"]
           EOF
           docker buildx build --platform linux/arm64 -t rtp2httpd:arm64 --output type=docker,dest=rtp2httpd_arm64.tar .
       - uses: actions/upload-artifact@v4
