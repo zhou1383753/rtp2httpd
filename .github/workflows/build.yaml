@@ -6,14 +6,14 @@ jobs:
     steps:
       - name: Download Binary
         run: |
-          # 下载作者发布的 ARM64 预编译版本
-          curl -L https://github.com/stackia/rtp2httpd/releases/latest/download/rtp2httpd-aarch64 -o rtp2httpd
+          # 确保下载的是针对 RB5009 的 aarch64 版本
+          curl -L https://github.com/stackia/rtp2httpd/releases/download/v1.0.1/rtp2httpd-aarch64 -o rtp2httpd
           chmod +x rtp2httpd
 
       - name: Create Dockerfile
         run: |
           cat <<EOF > Dockerfile
-          FROM alpine:latest
+          FROM alpine:3.18
           RUN apk add --no-cache musl
           COPY rtp2httpd /usr/bin/rtp2httpd
           EXPOSE 5140
@@ -24,13 +24,15 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and Export Tar
+      - name: Build Image
         run: |
-          # 这一步将文件打包成 RB5009 识别的容器镜像包
-          docker buildx build --platform linux/arm64 -t rtp2httpd:arm64 --output type=docker,dest=rtp2httpd_arm64.tar .
+          # 仅在本地构建镜像，不导出
+          docker build -t rtp2httpd-arm64:latest .
+
+      - name: Export for MikroTik
+        run: |
+          # 使用 save 命令导出，这种格式导入 MikroTik 成功率最高
+          docker save rtp2httpd-arm64:latest > rtp2httpd_arm64.tar
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
