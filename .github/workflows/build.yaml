@@ -1,0 +1,36 @@
+name: build-arm64
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Prebuilt Binary
+        run: |
+          # 直接下载作者编译好的成品 (针对 RB5009 的 ARM64 架构)
+          wget https://github.com/stackia/rtp2httpd/releases/latest/download/rtp2httpd-aarch64 -O rtp2httpd
+          chmod +x rtp2httpd
+
+      - name: Create Dockerfile
+        run: |
+          cat <<EOF > Dockerfile
+          FROM alpine:latest
+          RUN apk add --no-cache musl
+          COPY rtp2httpd /usr/bin/rtp2httpd
+          EXPOSE 5140
+          ENTRYPOINT ["/usr/bin/rtp2httpd"]
+          CMD ["-p", "5140"]
+          EOF
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Export Tar
+        run: |
+          # 打包成适用于 RB5009 的镜像文件
+          docker buildx build --platform linux/arm64 -t rtp2httpd:arm64 --output type=docker,dest=rtp2httpd_arm64.tar .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rb5009-tar
+          path: rtp2httpd_arm64.tar
