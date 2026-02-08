@@ -4,21 +4,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Correct Binary
+      - name: Download ARM64 Binary
         run: |
-          # 显式下载 v1.0.1 的 aarch64 版本
+          # 显式下载针对 aarch64 (ARM64) 的二进制文件
           curl -L "https://github.com/stackia/rtp2httpd/releases/download/v1.0.1/rtp2httpd-aarch64" -o rtp2httpd
           chmod +x rtp2httpd
-          # 打印文件信息，确保输出包含 "ARM aarch64"
+          # 验证文件类型，防止下载到错误的网页内容
           file rtp2httpd
 
       - name: Create Dockerfile
         run: |
           cat <<EOF > Dockerfile
+          # 使用明确支持 arm64 的 alpine 版本
           FROM --platform=linux/arm64 alpine:3.18
           RUN apk add --no-cache musl
           COPY rtp2httpd /usr/bin/rtp2httpd
-          # 修正执行权限
           RUN chmod +x /usr/bin/rtp2httpd
           EXPOSE 5140
           ENTRYPOINT ["/usr/bin/rtp2httpd"]
@@ -31,9 +31,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Save
+      - name: Build and Export
         run: |
-          # 强制指定架构构建并保存为标准 TAR
+          # 强制指定 arm64 架构打包，并使用 save 导出最纯净的 TAR
           docker buildx build --platform linux/arm64 -t rtp2httpd:arm64 --load .
           docker save rtp2httpd:arm64 > rtp2httpd_arm64.tar
 
