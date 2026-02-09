@@ -1,0 +1,21 @@
+name: Download and Package ARM64 Image
+
+on:
+  workflow_dispatch: # 允许手动点击按钮触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and Save Docker Image
+        run: |
+          # 拉取指定架构镜像
+          docker pull --platform linux/arm64 ghcr.io/stackia/rtp2httpd:latest
+          # 导出为 tar 文件
+          docker save ghcr.io/stackia/rtp2httpd:latest -o rtp2httpd_arm64.tar
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtp2httpd-arm64-tar
+          path: rtp2httpd_arm64.tar
